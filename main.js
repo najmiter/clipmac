@@ -4,7 +4,7 @@ const {
   BrowserWindow,
   clipboard,
   ipcMain,
-  shell, // Added shell
+  shell,
 } = require('electron');
 const path = require('path');
 
@@ -55,7 +55,7 @@ function createPopup() {
     movable: true,
     darkTheme: true,
     show: false,
-    backgroundColor: '#181818', // Match popup.html body background
+    backgroundColor: '#181818',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -64,9 +64,6 @@ function createPopup() {
   popupWindow.loadFile('popup.html');
 
   popupWindow.once('ready-to-show', () => {
-    // This will be called by showPopup logic now, or handled there.
-    // popupWindow.show(); // show() will be called by showPopup
-    // Send initial history if needed, though showPopup will also do this.
     if (popupWindow.webContents) {
       popupWindow.webContents.send(
         'clipboard-history-update',
@@ -77,20 +74,18 @@ function createPopup() {
 
   popupWindow.on('blur', () => {
     if (popupWindow && !popupWindow.isDestroyed()) {
-      popupWindow.hide(); // Hide instead of close
+      popupWindow.hide();
     }
   });
 
   popupWindow.on('closed', () => {
-    popupWindow = null; // This will be called if window is destroyed
+    popupWindow = null;
   });
 }
 
 function showPopup() {
   if (!popupWindow || popupWindow.isDestroyed()) {
     createPopup();
-    // createPopup's 'ready-to-show' will call show() and send history
-    // However, to ensure show is called:
     popupWindow.once('ready-to-show', () => {
       popupWindow.show();
     });
@@ -99,7 +94,6 @@ function showPopup() {
       popupWindow.show();
     }
     popupWindow.focus();
-    // Always send history update when showing, as it might have changed
     if (popupWindow.webContents) {
       popupWindow.webContents.send(
         'clipboard-history-update',
@@ -155,16 +149,6 @@ app.whenReady().then(() => {
   ipcMain.on('open-external-link', (event, url) => {
     shell.openExternal(url);
   });
-
-  /*
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      
-      
-      
-    }
-  });
-  */
 });
 
 app.on('window-all-closed', (event) => {
@@ -174,6 +158,6 @@ app.on('window-all-closed', (event) => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (popupWindow && !popupWindow.isDestroyed()) {
-    popupWindow.destroy(); // Explicitly destroy the window on quit
+    popupWindow.destroy();
   }
 });
