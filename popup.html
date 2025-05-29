@@ -20,7 +20,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #333;
+        background: #202020;
         padding: 8px 10px;
         border-radius: 5px;
         gap: 5px;
@@ -30,21 +30,32 @@
         line-clamp: 2;
         overflow: hidden;
         text-overflow: ellipsis;
-        color: #999;
+        color: #bbb;
         font-size: 14px;
+        min-width: 0;
+      }
+      .history-timestamp {
+        font-size: 11px;
+        color: #999;
+        margin-top: 5px;
+      }
+      .history-content {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
         min-width: 0;
       }
       .copy-button {
         padding: 5px 10px;
-        background-color: #555;
-        color: white;
+        background-color: #303030;
+        color: #ddd;
         border: none;
         width: fit-content;
         border-radius: 3px;
         cursor: pointer;
       }
       .copy-button:hover {
-        background-color: #777;
+        background-color: #353535;
       }
       #history-list {
         list-style-type: none;
@@ -102,22 +113,40 @@
         const ul = document.createElement('ul');
         ul.id = 'history-list';
 
-        history.forEach((text) => {
+        history.forEach((entry) => {
           const li = document.createElement('li');
           li.className = 'history-item';
 
+          const contentDiv = document.createElement('div');
+          contentDiv.className = 'history-content';
+
           const textSpan = document.createElement('span');
           textSpan.className = 'history-text';
-          textSpan.textContent = text.substring(0, 100);
+          textSpan.textContent = entry.text.substring(0, 100);
+
+          const timestampSpan = document.createElement('span');
+          timestampSpan.className = 'history-timestamp';
+          const timestamp = new Date(entry.timestamp).toLocaleTimeString(
+            'en-us',
+            {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }
+          );
+          timestampSpan.textContent = `Copied at: ${timestamp}`;
+
+          contentDiv.appendChild(textSpan);
+          contentDiv.appendChild(timestampSpan);
 
           const copyButton = document.createElement('button');
           copyButton.className = 'copy-button';
           copyButton.textContent = 'Copy';
           copyButton.onclick = () => {
-            window.clipboardAPI.copyTextToClipboard(text);
+            window.clipboardAPI.copyTextToClipboard(entry.text);
           };
 
-          li.appendChild(textSpan);
+          li.appendChild(contentDiv);
           li.appendChild(copyButton);
           ul.appendChild(li);
         });

@@ -20,12 +20,14 @@ let previousClipboardText = '';
 function updateClipboardHistory() {
   const currentText = clipboard.readText();
   if (currentText && currentText !== previousClipboardText) {
-    const existingIndex = clipboardHistory.indexOf(currentText);
+    const existingIndex = clipboardHistory.findIndex(
+      (item) => item.text === currentText
+    );
     if (existingIndex > -1) {
       clipboardHistory.splice(existingIndex, 1);
     }
 
-    clipboardHistory.unshift(currentText);
+    clipboardHistory.unshift({ text: currentText, timestamp: Date.now() });
     if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
       clipboardHistory.length = MAX_HISTORY_LENGTH;
     }
@@ -130,8 +132,6 @@ app.whenReady().then(() => {
 
   if (tray) {
     const contextMenu = Menu.buildFromTemplate([
-      { label: 'Show History', click: showPopup },
-      { type: 'separator' },
       {
         label: 'Quit ClipMac',
         click: () => {
@@ -160,7 +160,10 @@ app.whenReady().then(() => {
 
   previousClipboardText = clipboard.readText();
   if (previousClipboardText) {
-    clipboardHistory.unshift(previousClipboardText);
+    clipboardHistory.unshift({
+      text: previousClipboardText,
+      timestamp: Date.now(),
+    });
     if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
       clipboardHistory.length = MAX_HISTORY_LENGTH;
     }
@@ -173,11 +176,13 @@ app.whenReady().then(() => {
   ipcMain.on('copy-text-to-clipboard', (event, text) => {
     clipboard.writeText(text);
 
-    const existingIndex = clipboardHistory.indexOf(text);
+    const existingIndex = clipboardHistory.findIndex(
+      (item) => item.text === text
+    );
     if (existingIndex > -1) {
       clipboardHistory.splice(existingIndex, 1);
     }
-    clipboardHistory.unshift(text);
+    clipboardHistory.unshift({ text: text, timestamp: Date.now() });
     if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
       clipboardHistory.length = MAX_HISTORY_LENGTH;
     }
