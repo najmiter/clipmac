@@ -5,13 +5,16 @@ const {
   clipboard,
   ipcMain,
   shell,
+  Tray,
+  Menu,
 } = require('electron');
 const path = require('path');
 
 let popupWindow;
+let tray = null;
 let clipboardHistory = [];
 const MAX_HISTORY_LENGTH = 50;
-const CLIPBOARD_CHECK_INTERVAL = 1000;
+const CLIPBOARD_CHECK_INTERVAL = 1_000;
 let previousClipboardText = '';
 
 function updateClipboardHistory() {
@@ -88,12 +91,20 @@ function showPopup() {
     createPopup();
     popupWindow.once('ready-to-show', () => {
       popupWindow.show();
+
+      if (popupWindow.webContents) {
+        popupWindow.webContents.send(
+          'clipboard-history-update',
+          clipboardHistory
+        );
+      }
     });
   } else {
     if (!popupWindow.isVisible()) {
       popupWindow.show();
     }
     popupWindow.focus();
+
     if (popupWindow.webContents) {
       popupWindow.webContents.send(
         'clipboard-history-update',
@@ -104,6 +115,37 @@ function showPopup() {
 }
 
 app.whenReady().then(() => {
+  const iconName =
+    process.platform === 'darwin' ? 'iconTemplate.png' : 'icon.png';
+  const iconPath = path.join(__dirname, 'assets', iconName);
+  try {
+    tray = new Tray(iconPath);
+  } catch (error) {
+    console.error(
+      'Failed to create tray icon. Make sure an icon file exists at:',
+      iconPath,
+      error
+    );
+  }
+
+  if (tray) {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Show History', click: showPopup },
+      { type: 'separator' },
+      {
+        label: 'Quit ClipMac',
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        },
+      },
+    ]);
+    tray.setToolTip('ClipMac - Clipboard Manager');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', showPopup);
+  }
+
   if (process.platform === 'darwin') {
     app.dock.hide();
   }
@@ -165,5 +207,8 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (popupWindow && !popupWindow.isDestroyed()) {
     popupWindow.destroy();
+  }
+  if (tray) {
+    tray.destroy();
   }
 });
