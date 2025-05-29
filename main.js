@@ -108,6 +108,14 @@ app.whenReady().then(() => {
     app.dock.hide();
   }
 
+  if (!app.isPackaged) {
+    // dev
+  } else {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+    });
+  }
+
   previousClipboardText = clipboard.readText();
   if (previousClipboardText) {
     clipboardHistory.unshift(previousClipboardText);
@@ -151,9 +159,7 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', (event) => {
-  event.preventDefault();
-});
+app.on('window-all-closed', (event) => {});
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();

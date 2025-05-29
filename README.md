@@ -9,6 +9,7 @@ ClipMac is a lightweight (or is it) clipboard history manager for macOS. It keep
 - **Copy to Clipboard:** Easily copy any item from the history back to your clipboard.
 - **Simple Interface:** Clean and straightforward user interface.
 - **Dockless Application:** Runs in the background without a dock icon.
+- **Auto-launch at startup:** Automatically starts when you log in to your Mac (production build only).
 
 ## How to Use
 
