@@ -3,7 +3,16 @@
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.najmiter.clipmac",
+    "mac": {
+      "target": "dmg",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    }
   },
   "keywords": [
     "clipboard",
@@ -12,7 +21,9 @@
   "author": "Najam",
   "license": "MIT",
   "description": "Clipboard on MacOS the way it should have been (minus the javascript part)",
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "electron-builder": "^26.0.12",
     "electron": "^36.3.2"
   }
 }
