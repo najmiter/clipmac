@@ -11,7 +11,8 @@
     "mac": {
       "target": "dmg",
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "icon": "assets/icon.png"
     }
   },
   "keywords": [
