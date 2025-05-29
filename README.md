@@ -1,5 +1,9 @@
 # ClipMac - Clipboard History Manager for macOS
 
+<p align="center">
+  <img src="assets/icon.png" alt="ClipMac Icon">
+</p>
+
 ClipMac is a lightweight (or is it) clipboard history manager for macOS. It keeps track of the text you copy, allowing you to easily access and reuse previous clipboard entries.
 
 ## Features
