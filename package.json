@@ -22,9 +22,11 @@
   "author": "Najam",
   "license": "MIT",
   "description": "Clipboard on MacOS the way it should have been (minus the javascript part)",
-  "dependencies": {},
+  "dependencies": {
+    "sqlite3": "^5.1.7"
+  },
   "devDependencies": {
-    "electron-builder": "^26.0.12",
-    "electron": "^36.3.2"
+    "electron": "^36.3.2",
+    "electron-builder": "^26.0.12"
   }
 }

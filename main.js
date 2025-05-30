@@ -9,41 +9,29 @@ const {
   Menu,
 } = require('electron');
 const path = require('path');
+const dbUtil = require('./utils/db');
 
 let popupWindow;
 let tray = null;
-let clipboardHistory = [];
-const MAX_HISTORY_LENGTH = 50;
+const MAX_HISTORY_LENGTH = 100;
 const CLIPBOARD_CHECK_INTERVAL = 1_000;
 let previousClipboardText = '';
 
 function updateClipboardHistory() {
   const currentText = clipboard.readText();
   if (currentText && currentText !== previousClipboardText) {
-    const existingIndex = clipboardHistory.findIndex(
-      (item) => item.text === currentText
-    );
-    if (existingIndex > -1) {
-      clipboardHistory.splice(existingIndex, 1);
-    }
-
-    clipboardHistory.unshift({ text: currentText, timestamp: Date.now() });
-    if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
-      clipboardHistory.length = MAX_HISTORY_LENGTH;
-    }
     previousClipboardText = currentText;
-
-    if (
-      popupWindow &&
-      !popupWindow.isDestroyed() &&
-      popupWindow.webContents &&
-      popupWindow.isVisible()
-    ) {
-      popupWindow.webContents.send(
-        'clipboard-history-update',
-        clipboardHistory
-      );
-    }
+    dbUtil.addTextToHistoryDB(currentText, (err, history) => {
+      if (err) return;
+      if (
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents &&
+        popupWindow.isVisible()
+      ) {
+        popupWindow.webContents.send('clipboard-history-update', history);
+      }
+    });
   } else if (!currentText && previousClipboardText) {
     previousClipboardText = '';
   }
@@ -69,12 +57,16 @@ function createPopup() {
   popupWindow.loadFile('popup.html');
 
   popupWindow.once('ready-to-show', () => {
-    if (popupWindow.webContents) {
-      popupWindow.webContents.send(
-        'clipboard-history-update',
-        clipboardHistory
-      );
-    }
+    dbUtil.fetchHistoryFromDB((err, history) => {
+      if (
+        !err &&
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents
+      ) {
+        popupWindow.webContents.send('clipboard-history-update', history);
+      }
+    });
   });
 
   popupWindow.on('blur', () => {
@@ -94,12 +86,16 @@ function showPopup() {
     popupWindow.once('ready-to-show', () => {
       popupWindow.show();
 
-      if (popupWindow.webContents) {
-        popupWindow.webContents.send(
-          'clipboard-history-update',
-          clipboardHistory
-        );
-      }
+      dbUtil.fetchHistoryFromDB((err, history) => {
+        if (
+          !err &&
+          popupWindow &&
+          !popupWindow.isDestroyed() &&
+          popupWindow.webContents
+        ) {
+          popupWindow.webContents.send('clipboard-history-update', history);
+        }
+      });
     });
   } else {
     if (!popupWindow.isVisible()) {
@@ -107,28 +103,30 @@ function showPopup() {
     }
     popupWindow.focus();
 
-    if (popupWindow.webContents) {
-      popupWindow.webContents.send(
-        'clipboard-history-update',
-        clipboardHistory
-      );
-    }
+    dbUtil.fetchHistoryFromDB((err, history) => {
+      if (
+        !err &&
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents
+      ) {
+        popupWindow.webContents.send('clipboard-history-update', history);
+      }
+    });
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await dbUtil.initDB(app.getPath('userData'), MAX_HISTORY_LENGTH);
+  } catch (dbInitError) {}
+
   const iconName =
     process.platform === 'darwin' ? 'iconTemplate.png' : 'icon.png';
   const iconPath = path.join(__dirname, 'assets', iconName);
   try {
     tray = new Tray(iconPath);
-  } catch (error) {
-    console.error(
-      'Failed to create tray icon. Make sure an icon file exists at:',
-      iconPath,
-      error
-    );
-  }
+  } catch (error) {}
 
   if (tray) {
     const contextMenu = Menu.buildFromTemplate([
@@ -160,13 +158,10 @@ app.whenReady().then(() => {
 
   previousClipboardText = clipboard.readText();
   if (previousClipboardText) {
-    clipboardHistory.unshift({
-      text: previousClipboardText,
-      timestamp: Date.now(),
+    dbUtil.addTextToHistoryDB(previousClipboardText, (err, initialHistory) => {
+      if (err) {
+      }
     });
-    if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
-      clipboardHistory.length = MAX_HISTORY_LENGTH;
-    }
   }
 
   setInterval(updateClipboardHistory, CLIPBOARD_CHECK_INTERVAL);
@@ -175,30 +170,19 @@ app.whenReady().then(() => {
 
   ipcMain.on('copy-text-to-clipboard', (event, text) => {
     clipboard.writeText(text);
-
-    const existingIndex = clipboardHistory.findIndex(
-      (item) => item.text === text
-    );
-    if (existingIndex > -1) {
-      clipboardHistory.splice(existingIndex, 1);
-    }
-    clipboardHistory.unshift({ text: text, timestamp: Date.now() });
-    if (clipboardHistory.length > MAX_HISTORY_LENGTH) {
-      clipboardHistory.length = MAX_HISTORY_LENGTH;
-    }
     previousClipboardText = text;
 
-    if (
-      popupWindow &&
-      !popupWindow.isDestroyed() &&
-      popupWindow.webContents &&
-      popupWindow.isVisible()
-    ) {
-      popupWindow.webContents.send(
-        'clipboard-history-update',
-        clipboardHistory
-      );
-    }
+    dbUtil.addTextToHistoryDB(text, (err, history) => {
+      if (err) return;
+      if (
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents &&
+        popupWindow.isVisible()
+      ) {
+        popupWindow.webContents.send('clipboard-history-update', history);
+      }
+    });
   });
 
   ipcMain.on('open-external-link', (event, url) => {
@@ -212,12 +196,18 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('will-quit', () => {
+app.on('will-quit', async () => {
   globalShortcut.unregisterAll();
   if (popupWindow && !popupWindow.isDestroyed()) {
     popupWindow.destroy();
   }
   if (tray) {
     tray.destroy();
+  }
+
+  try {
+    await dbUtil.closeDB();
+  } catch (dbCloseError) {
+    // console.error('Error closing database during quit:', dbCloseError);
   }
 });
