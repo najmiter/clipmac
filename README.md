@@ -8,7 +8,8 @@ ClipMac is a lightweight (or is it) clipboard history manager for macOS. It keep
 
 ## Features
 
-- **Clipboard History:** Stores a history of copied text items.
+- **Clipboard History:** Stores a history of copied text items in an sqlite db (locally).
+- **Query History:** Search through the history from the past.
 - **Quick Access:** Open the clipboard history popup using a global shortcut (`Control+Shift+Space`).
 - **Copy to Clipboard:** Easily copy any item from the history back to your clipboard.
 - **Simple Interface:** Clean and straightforward user interface.
