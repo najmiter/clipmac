@@ -73,6 +73,9 @@ function createPopup() {
   popupWindow.on('blur', () => {
     if (popupWindow && !popupWindow.isDestroyed()) {
       popupWindow.hide();
+      if (process.platform === 'darwin') {
+        app.hide();
+      }
     }
   });
 
@@ -82,6 +85,10 @@ function createPopup() {
 }
 
 function showPopup() {
+  if (process.platform === 'darwin') {
+    app.show();
+  }
+
   if (!popupWindow || popupWindow.isDestroyed()) {
     createPopup();
     popupWindow.once('ready-to-show', () => {
@@ -195,6 +202,9 @@ app.whenReady().then(async () => {
   ipcMain.on('close-popup-on-escape', () => {
     if (popupWindow && !popupWindow.isDestroyed() && popupWindow.isVisible()) {
       popupWindow.hide();
+      if (process.platform === 'darwin') {
+        app.hide();
+      }
     }
   });
 
