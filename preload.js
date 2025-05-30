@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('clipboardAPI', {
     ipcRenderer.send('copy-text-to-clipboard', text),
   openExternalLink: (url) => ipcRenderer.send('open-external-link', url),
   closePopupOnEscape: () => ipcRenderer.send('close-popup-on-escape'),
+  searchHistory: (query) => ipcRenderer.send('search-history', query),
+  onClearSearch: (callback) => ipcRenderer.on('clear-search', callback),
 });

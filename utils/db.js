@@ -107,6 +107,36 @@ function addTextToHistoryDB(text, callback) {
   });
 }
 
+function searchHistoryInDB(query, callback) {
+  if (!db) {
+    const err = new Error('Database not initialized.');
+    if (callback) callback(err, []);
+    return;
+  }
+
+  if (!query || query.trim() === '') {
+    fetchHistoryFromDB(callback);
+    return;
+  }
+
+  const searchTerm = `%${query}%`;
+  db.all(
+    `SELECT text, timestamp FROM history 
+     WHERE LOWER(text) LIKE LOWER(?) 
+     ORDER BY timestamp DESC 
+     LIMIT ?`,
+    [searchTerm, currentMaxHistoryLength],
+    (err, rows) => {
+      if (err) {
+        // console.error('Error searching history in DB', err.message);
+        if (callback) callback(err, []);
+        return;
+      }
+      if (callback) callback(null, rows || []);
+    }
+  );
+}
+
 function closeDB() {
   return new Promise((resolve, reject) => {
     if (db) {
@@ -129,5 +159,6 @@ module.exports = {
   initDB,
   fetchHistoryFromDB,
   addTextToHistoryDB,
+  searchHistoryInDB,
   closeDB,
 };

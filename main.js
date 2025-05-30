@@ -65,6 +65,7 @@ function createPopup() {
         popupWindow.webContents
       ) {
         popupWindow.webContents.send('clipboard-history-update', history);
+        popupWindow.webContents.send('clear-search');
       }
     });
   });
@@ -94,6 +95,7 @@ function showPopup() {
           popupWindow.webContents
         ) {
           popupWindow.webContents.send('clipboard-history-update', history);
+          popupWindow.webContents.send('clear-search');
         }
       });
     });
@@ -111,6 +113,7 @@ function showPopup() {
         popupWindow.webContents
       ) {
         popupWindow.webContents.send('clipboard-history-update', history);
+        popupWindow.webContents.send('clear-search');
       }
     });
   }
@@ -192,6 +195,35 @@ app.whenReady().then(async () => {
   ipcMain.on('close-popup-on-escape', () => {
     if (popupWindow && !popupWindow.isDestroyed() && popupWindow.isVisible()) {
       popupWindow.hide();
+    }
+  });
+
+  ipcMain.on('search-history', (event, query) => {
+    const searchCallback = (err, history) => {
+      if (err) {
+        // console.error('Error during search/fetch for history update:', err.message);
+        if (
+          popupWindow &&
+          !popupWindow.isDestroyed() &&
+          popupWindow.webContents
+        ) {
+          popupWindow.webContents.send('clipboard-history-update', []);
+        }
+        return;
+      }
+      if (
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents
+      ) {
+        popupWindow.webContents.send('clipboard-history-update', history);
+      }
+    };
+
+    if (query && query.trim() !== '') {
+      dbUtil.searchHistoryInDB(query, searchCallback);
+    } else {
+      dbUtil.fetchHistoryFromDB(searchCallback);
     }
   });
 });
