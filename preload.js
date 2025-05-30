@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('clipboardAPI', {
   copyTextToClipboard: (text) =>
     ipcRenderer.send('copy-text-to-clipboard', text),
   openExternalLink: (url) => ipcRenderer.send('open-external-link', url),
+  closePopupOnEscape: () => ipcRenderer.send('close-popup-on-escape'),
 });

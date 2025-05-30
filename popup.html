@@ -157,6 +157,12 @@
         event.preventDefault();
         window.clipboardAPI.openExternalLink(externalLink.href);
       });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          window.clipboardAPI.closePopupOnEscape();
+        }
+      });
     </script>
   </body>
 </html>

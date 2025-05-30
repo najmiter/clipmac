@@ -204,9 +204,13 @@ app.whenReady().then(() => {
   ipcMain.on('open-external-link', (event, url) => {
     shell.openExternal(url);
   });
-});
 
-app.on('window-all-closed', (event) => {});
+  ipcMain.on('close-popup-on-escape', () => {
+    if (popupWindow && !popupWindow.isDestroyed() && popupWindow.isVisible()) {
+      popupWindow.hide();
+    }
+  });
+});
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
