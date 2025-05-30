@@ -7,6 +7,7 @@ const {
   shell,
   Tray,
   Menu,
+  dialog,
 } = require('electron');
 const path = require('path');
 const dbUtil = require('./utils/db');
@@ -140,6 +141,39 @@ app.whenReady().then(async () => {
 
   if (tray) {
     const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Clear History',
+        click: async () => {
+          const { response } = await dialog.showMessageBox(
+            popupWindow || null,
+            {
+              type: 'question',
+              buttons: ['Cancel', 'Yes, Clear'],
+              defaultId: 0,
+              title: 'Confirm Clear History',
+              message: 'Are you sure you want to clear all clipboard history?',
+              detail: 'This action cannot be undone.',
+            }
+          );
+
+          if (response === 1) {
+            dbUtil.clearHistoryDB((err) => {
+              if (err) {
+                dialog.showErrorBox('Error', 'Failed to clear history.');
+                return;
+              }
+              if (
+                popupWindow &&
+                !popupWindow.isDestroyed() &&
+                popupWindow.webContents
+              ) {
+                popupWindow.webContents.send('clipboard-history-update', []);
+              }
+            });
+          }
+        },
+      },
+      { type: 'separator' },
       {
         label: 'Quit ClipMac',
         click: () => {

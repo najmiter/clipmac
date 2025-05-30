@@ -137,6 +137,22 @@ function searchHistoryInDB(query, callback) {
   );
 }
 
+function clearHistoryDB(callback) {
+  if (!db) {
+    const err = new Error('Database not initialized.');
+    if (callback) callback(err);
+    return;
+  }
+  db.run('DELETE FROM history', (err) => {
+    if (err) {
+      // console.error('Error clearing history from DB', err.message);
+      if (callback) callback(err);
+      return;
+    }
+    if (callback) callback(null);
+  });
+}
+
 function closeDB() {
   return new Promise((resolve, reject) => {
     if (db) {
@@ -160,5 +176,6 @@ module.exports = {
   fetchHistoryFromDB,
   addTextToHistoryDB,
   searchHistoryInDB,
+  clearHistoryDB,
   closeDB,
 };
