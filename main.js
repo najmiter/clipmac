@@ -132,8 +132,7 @@ app.whenReady().then(async () => {
     await dbUtil.initDB(app.getPath('userData'), MAX_HISTORY_LENGTH);
   } catch (dbInitError) {}
 
-  const iconName =
-    process.platform === 'darwin' ? 'iconTemplate.png' : 'icon.png';
+  const iconName = 'iconTemplate.png';
   const iconPath = path.join(__dirname, 'assets', iconName);
   try {
     tray = new Tray(iconPath);
@@ -212,24 +211,30 @@ app.whenReady().then(async () => {
 
   globalShortcut.register('Control+Shift+Space', showPopup);
 
-  ipcMain.on('copy-text-to-clipboard', (event, text) => {
+  ipcMain.on('copy-text-to-clipboard', (_, text) => {
     clipboard.writeText(text);
-    previousClipboardText = text;
-
-    dbUtil.addTextToHistoryDB(text, (err, history) => {
-      if (err) return;
-      if (
-        popupWindow &&
-        !popupWindow.isDestroyed() &&
-        popupWindow.webContents &&
-        popupWindow.isVisible()
-      ) {
-        popupWindow.webContents.send('clipboard-history-update', history);
-      }
-    });
+    new Promise(
+      (
+        // one of the greatest things about your personal projects is that you can write ugly ass code and no one can stop you
+        r = () => {
+          previousClipboardText = text;
+          dbUtil.addTextToHistoryDB(text, (err, history) => {
+            if (err) return;
+            if (
+              popupWindow &&
+              !popupWindow.isDestroyed() &&
+              popupWindow.webContents &&
+              popupWindow.isVisible()
+            ) {
+              popupWindow.webContents.send('clipboard-history-update', history);
+            }
+          });
+        }
+      ) => setTimeout(r, 1500)
+    );
   });
 
-  ipcMain.on('open-external-link', (event, url) => {
+  ipcMain.on('open-external-link', (_, url) => {
     shell.openExternal(url);
   });
 
@@ -242,7 +247,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('search-history', (event, query) => {
+  ipcMain.on('search-history', (_, query) => {
     const searchCallback = (err, history) => {
       if (err) {
         // console.error('Error during search/fetch for history update:', err.message);

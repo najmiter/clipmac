@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html style="user-select: none; color-scheme: dark" dir="ltr" lang="en-us">
   <head>
     <meta charset="UTF-8" />
     <title>Clipboard History</title>
@@ -184,6 +184,9 @@
           copyButton.className = 'copy-button';
           copyButton.textContent = 'Copy';
           li.onclick = () => {
+            // no need to reset these, bcz the whole thing rerenders anyway 😭
+            copyButton.textContent = 'Copied';
+            copyButton.style.color = 'green';
             window.clipboardAPI.copyTextToClipboard(entry.text);
           };
 
