@@ -39,6 +39,7 @@
         color: #bbb;
         font-size: 14px;
         min-width: 0;
+        max-width: 390px;
       }
       .history-timestamp {
         font-size: 11px;
@@ -152,6 +153,7 @@
         history.forEach((entry) => {
           const li = document.createElement('li');
           li.className = 'history-item';
+          li.title = 'Click anywhere to copy';
 
           const contentDiv = document.createElement('div');
           contentDiv.className = 'history-content';
