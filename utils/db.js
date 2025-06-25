@@ -12,18 +12,25 @@ function initDB(userDataPath, maxHistoryLength) {
       if (err) {
         reject(err);
       } else {
-        // console.log('Connected to the SQLite database.');
         db.run(
           `CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             text TEXT UNIQUE,
-            timestamp INTEGER
+            timestamp INTEGER,
+            title TEXT,
+            description TEXT,
+            tags TEXT
           )`,
           (tableErr) => {
             if (tableErr) {
-              // console.error('Error creating table', tableErr.message);
               reject(tableErr);
             } else {
+              db.run(`ALTER TABLE history ADD COLUMN title TEXT`, () => {});
+              db.run(
+                `ALTER TABLE history ADD COLUMN description TEXT`,
+                () => {}
+              );
+              db.run(`ALTER TABLE history ADD COLUMN tags TEXT`, () => {});
               resolve();
             }
           }
@@ -33,31 +40,64 @@ function initDB(userDataPath, maxHistoryLength) {
   });
 }
 
-function fetchHistoryFromDB(callback) {
+function fetchHistoryFromDB(callback, page = 1, limit = null) {
   if (!db) {
     const err = new Error('Database not initialized.');
-    // console.error(err.message);
-    if (callback) callback(err, []);
+    if (callback) callback(err, [], { total: 0, page: 1, hasMore: false });
     return;
   }
-  db.all(
-    'SELECT text, timestamp FROM history ORDER BY timestamp DESC LIMIT ?',
-    [currentMaxHistoryLength],
-    (err, rows) => {
-      if (err) {
-        // console.error('Error fetching history from DB', err.message);
-        if (callback) callback(err, []);
-        return;
-      }
-      if (callback) callback(null, rows || []);
+
+  const actualLimit = limit || currentMaxHistoryLength;
+  const offset = (page - 1) * actualLimit;
+
+  db.get('SELECT COUNT(*) as total FROM history', (countErr, countRow) => {
+    if (countErr) {
+      if (callback)
+        callback(countErr, [], { total: 0, page: 1, hasMore: false });
+      return;
     }
-  );
+
+    const total = countRow.total;
+    const hasMore = offset + actualLimit < total;
+
+    db.all(
+      'SELECT text, timestamp, title, description, tags FROM history ORDER BY timestamp DESC LIMIT ? OFFSET ?',
+      [actualLimit, offset],
+      (err, rows) => {
+        if (err) {
+          if (callback)
+            callback(err, [], { total: 0, page: 1, hasMore: false });
+          return;
+        }
+        const processedRows = rows
+          ? rows.map((row) => ({
+              ...row,
+              tags: row.tags ? JSON.parse(row.tags) : [],
+            }))
+          : [];
+
+        const paginationInfo = {
+          total,
+          page,
+          hasMore,
+          totalPages: Math.ceil(total / actualLimit),
+        };
+
+        if (callback) callback(null, processedRows, paginationInfo);
+      }
+    );
+  });
 }
 
-function addTextToHistoryDB(text, callback) {
+function addTextToHistoryDB(text, options = {}, callback) {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+
   if (!db) {
     const err = new Error('Database not initialized.');
-    // console.error(err.message);
+
     if (callback) fetchHistoryFromDB(callback);
     return;
   }
@@ -65,21 +105,20 @@ function addTextToHistoryDB(text, callback) {
     if (callback) fetchHistoryFromDB(callback);
     return;
   }
+
+  const { title = null, description = null, tags = [] } = options;
   const timestamp = Date.now();
+  const tagsJson = JSON.stringify(tags);
+
   db.serialize(() => {
     db.run(`DELETE FROM history WHERE text = ?`, [text], (delErr) => {
       if (delErr) {
-        // console.warn(
-        //   'Error deleting existing text from DB (or text not found):',
-        //   delErr.message
-        // );
       }
       db.run(
-        `INSERT INTO history (text, timestamp) VALUES (?, ?)`,
-        [text, timestamp],
+        `INSERT INTO history (text, timestamp, title, description, tags) VALUES (?, ?, ?, ?, ?)`,
+        [text, timestamp, title, description, tagsJson],
         (insErr) => {
           if (insErr) {
-            // console.error('Error inserting text to DB:', insErr.message);
             fetchHistoryFromDB(callback);
             return;
           }
@@ -96,7 +135,6 @@ function addTextToHistoryDB(text, callback) {
             [currentMaxHistoryLength],
             (trimErr) => {
               if (trimErr) {
-                // console.error('Error trimming DB history:', trimErr.message);
               }
               fetchHistoryFromDB(callback);
             }
@@ -107,32 +145,70 @@ function addTextToHistoryDB(text, callback) {
   });
 }
 
-function searchHistoryInDB(query, callback) {
+function searchHistoryInDB(query, callback, page = 1, limit = 50) {
   if (!db) {
     const err = new Error('Database not initialized.');
-    if (callback) callback(err, []);
+    if (callback) callback(err, [], { total: 0, page: 1, hasMore: false });
     return;
   }
 
   if (!query || query.trim() === '') {
-    fetchHistoryFromDB(callback);
+    fetchHistoryFromDB(callback, page, limit);
     return;
   }
 
   const searchTerm = `%${query}%`;
-  db.all(
-    `SELECT text, timestamp FROM history 
+  const offset = (page - 1) * limit;
+
+  db.get(
+    `SELECT COUNT(*) as total FROM history 
      WHERE LOWER(text) LIKE LOWER(?) 
-     ORDER BY timestamp DESC 
-     LIMIT ?`,
-    [searchTerm, currentMaxHistoryLength],
-    (err, rows) => {
-      if (err) {
-        // console.error('Error searching history in DB', err.message);
-        if (callback) callback(err, []);
+        OR LOWER(title) LIKE LOWER(?)
+        OR LOWER(description) LIKE LOWER(?)
+        OR LOWER(tags) LIKE LOWER(?)`,
+    [searchTerm, searchTerm, searchTerm, searchTerm],
+    (countErr, countRow) => {
+      if (countErr) {
+        if (callback)
+          callback(countErr, [], { total: 0, page: 1, hasMore: false });
         return;
       }
-      if (callback) callback(null, rows || []);
+
+      const total = countRow.total;
+      const hasMore = offset + limit < total;
+
+      db.all(
+        `SELECT text, timestamp, title, description, tags FROM history 
+         WHERE LOWER(text) LIKE LOWER(?) 
+            OR LOWER(title) LIKE LOWER(?)
+            OR LOWER(description) LIKE LOWER(?)
+            OR LOWER(tags) LIKE LOWER(?)
+         ORDER BY timestamp DESC 
+         LIMIT ? OFFSET ?`,
+        [searchTerm, searchTerm, searchTerm, searchTerm, limit, offset],
+        (err, rows) => {
+          if (err) {
+            if (callback)
+              callback(err, [], { total: 0, page: 1, hasMore: false });
+            return;
+          }
+          const processedRows = rows
+            ? rows.map((row) => ({
+                ...row,
+                tags: row.tags ? JSON.parse(row.tags) : [],
+              }))
+            : [];
+
+          const paginationInfo = {
+            total,
+            page,
+            hasMore,
+            totalPages: Math.ceil(total / limit),
+          };
+
+          if (callback) callback(null, processedRows, paginationInfo);
+        }
+      );
     }
   );
 }
@@ -145,7 +221,6 @@ function clearHistoryDB(callback) {
   }
   db.run('DELETE FROM history', (err) => {
     if (err) {
-      // console.error('Error clearing history from DB', err.message);
       if (callback) callback(err);
       return;
     }
@@ -158,10 +233,8 @@ function closeDB() {
     if (db) {
       db.close((err) => {
         if (err) {
-          // console.error('Error closing database', err.message);
           reject(err);
         } else {
-          // console.log('Database connection closed.');
           resolve();
         }
       });
@@ -171,6 +244,31 @@ function closeDB() {
   });
 }
 
+function updateHistoryEntryDB(updatedEntry, callback) {
+  if (!db) {
+    const err = new Error('Database not initialized.');
+    if (callback) callback(err, []);
+    return;
+  }
+
+  const { text, title, description, tags } = updatedEntry;
+  const tagsJson = JSON.stringify(tags || []);
+
+  db.run(
+    `UPDATE history SET title = ?, description = ?, tags = ? WHERE text = ?`,
+    [title, description, tagsJson, text],
+    function (err) {
+      if (err) {
+        console.error('Error updating history entry:', err.message);
+        if (callback) callback(err, []);
+        return;
+      }
+
+      fetchHistoryFromDB(callback);
+    }
+  );
+}
+
 module.exports = {
   initDB,
   fetchHistoryFromDB,
@@ -178,4 +276,5 @@ module.exports = {
   searchHistoryInDB,
   clearHistoryDB,
   closeDB,
+  updateHistoryEntryDB,
 };

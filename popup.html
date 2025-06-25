@@ -3,105 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <title>Clipboard History</title>
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        position: relative;
-        font-family: system-ui;
-        background-color: #181818;
-        color: #fff;
-        overflow: hidden;
-        height: 100%;
-      }
-      .history-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #202020;
-        padding: 8px 10px;
-        border-radius: 5px;
-        gap: 5px;
-        cursor: pointer;
-        transition: background-color 0.25s ease;
-        &:hover {
-          background-color: #2a2a2a;
-        }
-      }
-      .history-text {
-        white-space: pre-wrap;
-        line-clamp: 2;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #bbb;
-        font-size: 14px;
-        min-width: 0;
-        max-width: 390px;
-      }
-      .history-timestamp {
-        font-size: 11px;
-        color: #999;
-        margin-top: 5px;
-      }
-      .history-content {
-        display: flex;
-        flex-direction: column;
-        flex-grow: 1;
-        min-width: 0;
-      }
-      .copy-button {
-        padding: 5px 10px;
-        background-color: #303030;
-        color: #ddd;
-        border: none;
-        width: fit-content;
-        border-radius: 3px;
-        cursor: pointer;
-      }
-      .copy-button:hover {
-        background-color: #353535;
-      }
-      #history-list {
-        list-style-type: none;
-        padding: 0;
-        display: grid;
-        gap: 8px;
-      }
-      #history-container {
-        height: calc(560px - 50px);
-        overflow-y: auto;
-        padding: 10px;
-        padding-top: 0;
-        color: #bbb;
-        font-size: 14px;
-      }
-      #search-input {
-        width: calc(100% - 20px);
-        padding: 8px 10px;
-        margin: 10px 10px 0px 10px;
-        box-sizing: border-box;
-        border-radius: 5px;
-        border: 1px solid #333;
-        background-color: #252525;
-        color: #fff;
-        font-size: 14px;
-        outline: none;
-        z-index: 100;
-        position: sticky;
-        top: 0;
-        box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.4);
-      }
-      #search-input:focus {
-        outline: none;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <input type="search" id="search-input" placeholder="Search history..." />
     <div id="history-container">Loading...</div>
+    <div
+      class="pagination-container"
+      id="pagination-container"
+      style="display: none"
+    >
+      <button class="pagination-btn" id="prev-btn">← Previous</button>
+      <span class="pagination-info" id="pagination-info"></span>
+      <button class="pagination-btn" id="next-btn">Next →</button>
+    </div>
     <footer
       style="
         text-align: center;
@@ -131,17 +46,55 @@
       const historyContainer = document.getElementById('history-container');
       const externalLink = document.getElementById('external-link');
       const searchInput = document.getElementById('search-input');
+      const paginationContainer = document.getElementById(
+        'pagination-container'
+      );
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const paginationInfo = document.getElementById('pagination-info');
 
-      let currentHistory = []; // kinda cache
+      let currentHistory = [];
+      let currentPaginationInfo = {
+        total: 0,
+        page: 1,
+        hasMore: false,
+        totalPages: 1,
+      };
 
-      function displayHistory(history) {
+      function updatePaginationControls(paginationData) {
+        if (!paginationData) return;
+
+        currentPaginationInfo = paginationData;
+
+        if (paginationData.total <= 20) {
+          paginationContainer.style.display = 'none';
+          return;
+        }
+
+        paginationContainer.style.display = 'flex';
+
+        prevBtn.disabled = paginationData.page <= 1;
+        nextBtn.disabled = !paginationData.hasMore;
+
+        const startItem = (paginationData.page - 1) * 20 + 1;
+        const endItem = Math.min(
+          paginationData.page * 20,
+          paginationData.total
+        );
+
+        paginationInfo.textContent = `${startItem}-${endItem} of ${paginationData.total}`;
+      }
+
+      function displayHistory(history, paginationData) {
         historyContainer.innerHTML = '';
+        updatePaginationControls(paginationData);
 
         if (!history || history.length === 0) {
           historyContainer.innerText = searchInput.value
             ? '(No results found for your search)'
             : '(Clipboard history is empty)';
           historyContainer.style.padding = '20px';
+          paginationContainer.style.display = 'none';
           return;
         } else {
           historyContainer.style.padding = '10px';
@@ -150,17 +103,60 @@
         const ul = document.createElement('ul');
         ul.id = 'history-list';
 
-        history.forEach((entry) => {
+        history.forEach((entry, index) => {
           const li = document.createElement('li');
           li.className = 'history-item';
-          li.title = 'Click anywhere to copy';
+          li.title = 'Click text area to copy';
+          li.style.cursor = 'default';
 
           const contentDiv = document.createElement('div');
           contentDiv.className = 'history-content';
 
+          if (entry.title && !li.classList.contains('editing')) {
+            const titleSpan = document.createElement('div');
+            titleSpan.className = 'history-title';
+            titleSpan.textContent = entry.title;
+            contentDiv.appendChild(titleSpan);
+          }
+
+          if (entry.description && !li.classList.contains('editing')) {
+            const descSpan = document.createElement('div');
+            descSpan.className = 'history-description';
+            descSpan.textContent = entry.description;
+            contentDiv.appendChild(descSpan);
+          }
+
+          if (
+            entry.tags &&
+            entry.tags.length > 0 &&
+            !li.classList.contains('editing')
+          ) {
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'history-tags';
+            entry.tags.forEach((tag) => {
+              const tagSpan = document.createElement('span');
+              tagSpan.className = 'tag';
+              tagSpan.textContent = tag;
+              tagsDiv.appendChild(tagSpan);
+            });
+            contentDiv.appendChild(tagsDiv);
+          }
+
           const textSpan = document.createElement('span');
           textSpan.className = 'history-text';
           textSpan.textContent = entry.text.substring(0, 100);
+          textSpan.style.cursor = 'pointer';
+          textSpan.title = 'Click to copy';
+          textSpan.onclick = (e) => {
+            e.stopPropagation();
+            window.clipboardAPI.copyTextToClipboard(entry.text);
+
+            const originalColor = textSpan.style.color;
+            textSpan.style.color = 'green';
+            setTimeout(() => {
+              textSpan.style.color = originalColor;
+            }, 1000);
+          };
 
           const timestampSpan = document.createElement('span');
           timestampSpan.className = 'history-timestamp';
@@ -180,26 +176,151 @@
           contentDiv.appendChild(textSpan);
           contentDiv.appendChild(timestampSpan);
 
+          const buttonGroup = document.createElement('div');
+          buttonGroup.className = 'button-group';
+
           const copyButton = document.createElement('button');
           copyButton.className = 'copy-button';
           copyButton.textContent = 'Copy';
-          li.onclick = () => {
-            // no need to reset these, bcz the whole thing rerenders anyway 😭
+          copyButton.onclick = (e) => {
+            e.stopPropagation();
             copyButton.textContent = 'Copied';
             copyButton.style.color = 'green';
             window.clipboardAPI.copyTextToClipboard(entry.text);
+            setTimeout(() => {
+              copyButton.textContent = 'Copy';
+              copyButton.style.color = '';
+            }, 1000);
           };
 
+          const metadataToggle = document.createElement('button');
+          metadataToggle.className = 'metadata-toggle';
+          metadataToggle.textContent = 'Edit';
+          metadataToggle.onclick = (e) => {
+            e.stopPropagation();
+            toggleMetadataEdit(li, entry, index);
+          };
+
+          buttonGroup.appendChild(copyButton);
+          buttonGroup.appendChild(metadataToggle);
+
           li.appendChild(contentDiv);
-          li.appendChild(copyButton);
+          li.appendChild(buttonGroup);
           ul.appendChild(li);
         });
         historyContainer.appendChild(ul);
       }
 
-      window.clipboardAPI.onClipboardHistoryUpdate((history) => {
-        currentHistory = history;
-        displayHistory(history);
+      function toggleMetadataEdit(li, entry, index) {
+        const existingMetadata = li.querySelector('.metadata-section');
+        if (existingMetadata) {
+          existingMetadata.remove();
+          li.classList.remove('editing');
+          return;
+        }
+
+        li.classList.add('editing');
+
+        const metadataSection = document.createElement('div');
+        metadataSection.className = 'metadata-section';
+
+        const titleField = document.createElement('div');
+        titleField.className = 'metadata-field';
+        titleField.innerHTML = `
+          <label>Title:</label>
+          <input type="text" class="title-input" value="${entry.title || ''}" placeholder="Add a title...">
+        `;
+
+        const descField = document.createElement('div');
+        descField.className = 'metadata-field';
+        descField.innerHTML = `
+          <label>Description:</label>
+          <textarea class="desc-input" placeholder="Add a description...">${entry.description || ''}</textarea>
+        `;
+
+        const tagsField = document.createElement('div');
+        tagsField.className = 'metadata-field';
+        tagsField.innerHTML = `
+          <label>Tags (comma-separated):</label>
+          <input type="text" class="tags-input" value="${entry.tags ? entry.tags.join(', ') : ''}" placeholder="tag1, tag2, tag3...">
+        `;
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'metadata-actions';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'save-btn';
+        saveBtn.textContent = 'Save';
+        saveBtn.onclick = (e) => {
+          e.stopPropagation();
+          saveMetadata(li, entry, index, metadataSection);
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'cancel-btn';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = (e) => {
+          e.stopPropagation();
+          metadataSection.remove();
+          li.classList.remove('editing');
+        };
+
+        actionsDiv.appendChild(saveBtn);
+        actionsDiv.appendChild(cancelBtn);
+
+        metadataSection.appendChild(titleField);
+        metadataSection.appendChild(descField);
+        metadataSection.appendChild(tagsField);
+        metadataSection.appendChild(actionsDiv);
+
+        li.querySelector('.history-content').appendChild(metadataSection);
+
+        metadataSection.querySelector('.title-input').focus();
+      }
+
+      function saveMetadata(li, entry, index, metadataSection) {
+        const titleInput = metadataSection.querySelector('.title-input');
+        const descInput = metadataSection.querySelector('.desc-input');
+        const tagsInput = metadataSection.querySelector('.tags-input');
+
+        const updatedEntry = {
+          ...entry,
+          title: titleInput.value.trim() || null,
+          description: descInput.value.trim() || null,
+          tags: tagsInput.value.trim()
+            ? tagsInput.value
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag)
+            : null,
+        };
+
+        currentHistory[index] = updatedEntry;
+
+        window.clipboardAPI.updateHistoryEntry(index, updatedEntry);
+
+        metadataSection.remove();
+        li.classList.remove('editing');
+        displayHistory(currentHistory);
+      }
+
+      window.clipboardAPI.onClipboardHistoryUpdate(
+        (history, paginationInfo) => {
+          currentHistory = history;
+          displayHistory(history, paginationInfo);
+        }
+      );
+
+      prevBtn.addEventListener('click', () => {
+        if (currentPaginationInfo.page > 1) {
+          window.clipboardAPI.loadPage(currentPaginationInfo.page - 1);
+        }
+      });
+
+      nextBtn.addEventListener('click', () => {
+        if (currentPaginationInfo.hasMore) {
+          window.clipboardAPI.loadPage(currentPaginationInfo.page + 1);
+        }
       });
 
       searchInput.addEventListener('input', () => {

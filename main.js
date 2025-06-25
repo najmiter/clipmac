@@ -16,7 +16,10 @@ let popupWindow;
 let tray = null;
 const MAX_HISTORY_LENGTH = 100;
 const CLIPBOARD_CHECK_INTERVAL = 1_000;
+const ITEMS_PER_PAGE = 20;
 let previousClipboardText = '';
+let currentPage = 1;
+let currentSearchQuery = '';
 
 function updateClipboardHistory() {
   const currentText = clipboard.readText();
@@ -58,17 +61,27 @@ function createPopup() {
   popupWindow.loadFile('popup.html');
 
   popupWindow.once('ready-to-show', () => {
-    dbUtil.fetchHistoryFromDB((err, history) => {
-      if (
-        !err &&
-        popupWindow &&
-        !popupWindow.isDestroyed() &&
-        popupWindow.webContents
-      ) {
-        popupWindow.webContents.send('clipboard-history-update', history);
-        popupWindow.webContents.send('clear-search');
-      }
-    });
+    currentPage = 1;
+    currentSearchQuery = '';
+    dbUtil.fetchHistoryFromDB(
+      (err, history, paginationInfo) => {
+        if (
+          !err &&
+          popupWindow &&
+          !popupWindow.isDestroyed() &&
+          popupWindow.webContents
+        ) {
+          popupWindow.webContents.send(
+            'clipboard-history-update',
+            history,
+            paginationInfo
+          );
+          popupWindow.webContents.send('clear-search');
+        }
+      },
+      currentPage,
+      ITEMS_PER_PAGE
+    );
   });
 
   popupWindow.on('blur', () => {
@@ -94,36 +107,56 @@ function showPopup() {
     createPopup();
     popupWindow.once('ready-to-show', () => {
       popupWindow.show();
+      currentPage = 1;
+      currentSearchQuery = '';
 
-      dbUtil.fetchHistoryFromDB((err, history) => {
-        if (
-          !err &&
-          popupWindow &&
-          !popupWindow.isDestroyed() &&
-          popupWindow.webContents
-        ) {
-          popupWindow.webContents.send('clipboard-history-update', history);
-          popupWindow.webContents.send('clear-search');
-        }
-      });
+      dbUtil.fetchHistoryFromDB(
+        (err, history, paginationInfo) => {
+          if (
+            !err &&
+            popupWindow &&
+            !popupWindow.isDestroyed() &&
+            popupWindow.webContents
+          ) {
+            popupWindow.webContents.send(
+              'clipboard-history-update',
+              history,
+              paginationInfo
+            );
+            popupWindow.webContents.send('clear-search');
+          }
+        },
+        currentPage,
+        ITEMS_PER_PAGE
+      );
     });
   } else {
     if (!popupWindow.isVisible()) {
       popupWindow.show();
     }
     popupWindow.focus();
+    currentPage = 1;
+    currentSearchQuery = '';
 
-    dbUtil.fetchHistoryFromDB((err, history) => {
-      if (
-        !err &&
-        popupWindow &&
-        !popupWindow.isDestroyed() &&
-        popupWindow.webContents
-      ) {
-        popupWindow.webContents.send('clipboard-history-update', history);
-        popupWindow.webContents.send('clear-search');
-      }
-    });
+    dbUtil.fetchHistoryFromDB(
+      (err, history, paginationInfo) => {
+        if (
+          !err &&
+          popupWindow &&
+          !popupWindow.isDestroyed() &&
+          popupWindow.webContents
+        ) {
+          popupWindow.webContents.send(
+            'clipboard-history-update',
+            history,
+            paginationInfo
+          );
+          popupWindow.webContents.send('clear-search');
+        }
+      },
+      currentPage,
+      ITEMS_PER_PAGE
+    );
   }
 }
 
@@ -192,7 +225,6 @@ app.whenReady().then(async () => {
   }
 
   if (!app.isPackaged) {
-    // dev
   } else {
     app.setLoginItemSettings({
       openAtLogin: true,
@@ -215,7 +247,6 @@ app.whenReady().then(async () => {
     clipboard.writeText(text);
     new Promise(
       (
-        // one of the greatest things about your personal projects is that you can write ugly ass code and no one can stop you
         r = () => {
           previousClipboardText = text;
           dbUtil.addTextToHistoryDB(text, (err, history) => {
@@ -248,16 +279,96 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('search-history', (_, query) => {
-    const searchCallback = (err, history) => {
+    currentSearchQuery = query;
+    currentPage = 1;
+
+    const searchCallback = (err, history, paginationInfo) => {
       if (err) {
-        // console.error('Error during search/fetch for history update:', err.message);
         if (
           popupWindow &&
           !popupWindow.isDestroyed() &&
           popupWindow.webContents
         ) {
-          popupWindow.webContents.send('clipboard-history-update', []);
+          popupWindow.webContents.send('clipboard-history-update', [], {
+            total: 0,
+            page: 1,
+            hasMore: false,
+          });
         }
+        return;
+      }
+      if (
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents
+      ) {
+        popupWindow.webContents.send(
+          'clipboard-history-update',
+          history,
+          paginationInfo
+        );
+      }
+    };
+
+    if (query && query.trim() !== '') {
+      dbUtil.searchHistoryInDB(
+        query,
+        searchCallback,
+        currentPage,
+        ITEMS_PER_PAGE
+      );
+    } else {
+      dbUtil.fetchHistoryFromDB(searchCallback, currentPage, ITEMS_PER_PAGE);
+    }
+  });
+
+  ipcMain.on('load-page', (_, page) => {
+    currentPage = page;
+
+    const loadCallback = (err, history, paginationInfo) => {
+      if (err) {
+        if (
+          popupWindow &&
+          !popupWindow.isDestroyed() &&
+          popupWindow.webContents
+        ) {
+          popupWindow.webContents.send('clipboard-history-update', [], {
+            total: 0,
+            page: 1,
+            hasMore: false,
+          });
+        }
+        return;
+      }
+      if (
+        popupWindow &&
+        !popupWindow.isDestroyed() &&
+        popupWindow.webContents
+      ) {
+        popupWindow.webContents.send(
+          'clipboard-history-update',
+          history,
+          paginationInfo
+        );
+      }
+    };
+
+    if (currentSearchQuery && currentSearchQuery.trim() !== '') {
+      dbUtil.searchHistoryInDB(
+        currentSearchQuery,
+        loadCallback,
+        currentPage,
+        ITEMS_PER_PAGE
+      );
+    } else {
+      dbUtil.fetchHistoryFromDB(loadCallback, currentPage, ITEMS_PER_PAGE);
+    }
+  });
+
+  ipcMain.on('update-history-entry', (_, index, updatedEntry) => {
+    dbUtil.updateHistoryEntryDB(updatedEntry, (err, history) => {
+      if (err) {
+        console.error('Error updating history entry:', err.message);
         return;
       }
       if (
@@ -267,13 +378,7 @@ app.whenReady().then(async () => {
       ) {
         popupWindow.webContents.send('clipboard-history-update', history);
       }
-    };
-
-    if (query && query.trim() !== '') {
-      dbUtil.searchHistoryInDB(query, searchCallback);
-    } else {
-      dbUtil.fetchHistoryFromDB(searchCallback);
-    }
+    });
   });
 });
 
@@ -288,7 +393,5 @@ app.on('will-quit', async () => {
 
   try {
     await dbUtil.closeDB();
-  } catch (dbCloseError) {
-    // console.error('Error closing database during quit:', dbCloseError);
-  }
+  } catch (dbCloseError) {}
 });
