@@ -44,7 +44,7 @@ function updateClipboardHistory() {
 function createPopup() {
   popupWindow = new BrowserWindow({
     width: 500,
-    height: 600,
+    height: 650,
     alwaysOnTop: true,
     frame: false,
     transparent: false,
@@ -58,7 +58,7 @@ function createPopup() {
     },
   });
 
-  popupWindow.loadFile('popup.html');
+  popupWindow.loadFile('src/popup.html');
 
   popupWindow.once('ready-to-show', () => {
     currentPage = 1;

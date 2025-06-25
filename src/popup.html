@@ -1,0 +1,47 @@
+<!doctype html>
+<html style="user-select: none; color-scheme: dark" dir="ltr" lang="en-us">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Clipboard History</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <div style="display: flex; flex-direction: column; height: 650px">
+      <input type="search" id="search-input" placeholder="Search history..." />
+      <div id="history-container">Loading...</div>
+      <div
+        class="pagination-container"
+        id="pagination-container"
+        style="display: none"
+      >
+        <button class="pagination-btn" id="prev-btn">← Previous</button>
+        <span class="pagination-info" id="pagination-info"></span>
+        <button class="pagination-btn" id="next-btn">Next →</button>
+      </div>
+      <footer
+        style="
+          text-align: center;
+          color: #666;
+          font-size: 10px;
+          line-height: 1;
+          bottom: 0;
+          background-color: #181818ab;
+          backdrop-filter: blur(10px);
+          padding: 10px;
+          width: 100%;
+          left: 0;
+        "
+      >
+        Developed by
+        <a
+          id="external-link"
+          href="https://github.com/najmiter/clipmac"
+          target="_blank"
+          style="color: #1e8fff9e"
+          >@najmiter</a
+        >
+      </footer>
+    </div>
+  </body>
+</html>
