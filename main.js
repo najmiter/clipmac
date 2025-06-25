@@ -14,7 +14,7 @@ const dbUtil = require('./utils/db');
 
 let popupWindow;
 let tray = null;
-const MAX_HISTORY_LENGTH = 100;
+const DEFAULT_FETCH_LIMIT = 100;
 const CLIPBOARD_CHECK_INTERVAL = 1_000;
 const ITEMS_PER_PAGE = 20;
 let previousClipboardText = '';
@@ -162,7 +162,7 @@ function showPopup() {
 
 app.whenReady().then(async () => {
   try {
-    await dbUtil.initDB(app.getPath('userData'), MAX_HISTORY_LENGTH);
+    await dbUtil.initDB(app.getPath('userData'), DEFAULT_FETCH_LIMIT);
   } catch (dbInitError) {}
 
   const iconName = 'iconTemplate.png';

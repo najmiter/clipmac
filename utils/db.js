@@ -122,23 +122,7 @@ function addTextToHistoryDB(text, options = {}, callback) {
             fetchHistoryFromDB(callback);
             return;
           }
-          db.run(
-            `
-            DELETE FROM history
-            WHERE id NOT IN (
-              SELECT id
-              FROM history
-              ORDER BY timestamp DESC
-              LIMIT ?
-            )
-          `,
-            [currentMaxHistoryLength],
-            (trimErr) => {
-              if (trimErr) {
-              }
-              fetchHistoryFromDB(callback);
-            }
-          );
+          fetchHistoryFromDB(callback);
         }
       );
     });
